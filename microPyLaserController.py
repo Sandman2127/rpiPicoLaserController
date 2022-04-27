@@ -1,6 +1,7 @@
 from machine import Pin, I2C
 from ssd1306 import SSD1306_I2C
 import time
+import framebuf
 # import framebuf
 
 # Pin definitions
@@ -11,20 +12,28 @@ adc_pin = machine.Pin(28)  #31 & 32 & 34 (GPs 26,27,28) are the only pins for AD
 #TODO: setup ADC and oled
 adc = machine.ADC(adc_pin)
 i2c = I2C(0,sda=Pin(0), scl=Pin(1), freq=400000) # pin 1 & 2, GP0, GP1
-oled = SSD1306_I2C(128, 64, i2c)
-adcDepth = 4096
-inputMilliVoltage = 3300
-inputMilliVoltBias = 16
+oled = SSD1306_I2C(128, 32, i2c)
+adcDepth = 65536
+#inputMilliVoltage = 3300
+#inputMilliVoltBias = 16
+inputVoltage = 3.300
+inputVoltageBias = 0.016
 resistorVal = 0.25
 maxOutput = 1200 # uW
+gammaSymbol = bytearray('\u03B3')
 
 def checkInputCurrent():
     #TODO: take ADC reading int 0 - 4096
     adcRawReading = adc.read_u16()
     #TODO: map and remove 16 mV bias, comes out as 0.0010257...
-    mappedVoltage = round((mapVal(adcRawReading,0,adcDepth,0,inputMilliVoltage) - inputMilliVoltBias)/1000,6)
+    mappedVoltage = round((mapVal(adcRawReading,0,adcDepth,0,inputVoltage) - inputVoltageBias),6)
     #TODO: V=IR, thus: I = V/R
-    mAtoLaserOutput = round((mappedVoltage/resistorVal),2)
+    #print(adcRawReading,mappedVoltage)
+    #TODO: true value of current across 0.25 ohm resistor assuming no voltage boosting 
+    #mAtoLaserOutput = int(1000 * (mappedVoltage/resistorVal))
+    #TODO: LM358 boosted value needs to be divided by 10 to get the true result:
+    mAtoLaserOutput = round((1000 * ((mappedVoltage/10)/resistorVal)),1)
+    print(adcRawReading,mappedVoltage,mAtoLaserOutput)
     return mAtoLaserOutput
 
 def mapVal(value, istart, istop, ostart, ostop):
@@ -32,26 +41,33 @@ def mapVal(value, istart, istop, ostart, ostop):
 
 def calculateLaserOutput(mAtoLaser):
     # 50 mA == 1.2 mW or 1200 uW
-    uW = round((mAtoLaser * (1200/50)),0)
+    uW = int(mAtoLaser*(1200/50))
     # mW = 1000 * uW
-    outputStr = 'output:' + str(uW) + 'uW'
+    outputStr = 'output: ' + str(uW) + ' uW'
     return outputStr
 
 if __name__ == '__main__':
     while True:
         #TODO: Title
-        oled.text('\u03B3 Cannon', 0, 0)
+        oled.fill(0)
+        #gammastr = '\u03B3'
+        #gamma = bytearray(gammastr.encode())
+        #fb = framebuf.FrameBuffer(gamma,128,32, framebuf.MONO_HLSB)
+        #oled.blit(fb,16,64)
+        oled.text("Photon Cannon", 13, 0)
         #TODO: Input (current)
         mAtoLaser = checkInputCurrent()
-        mAScreenVal = 'input:' + str(mAtoLaser) + 'mA (I)'
-        oled.text(mAScreenVal, 0, 24)
+        mAScreenVal = 'input: ' + str(mAtoLaser) + ' mA'
+        oled.text(mAScreenVal, 0, 12, 1)
+        print(mAScreenVal)
         #TODO: Output (γ)
         uWScreenVal = calculateLaserOutput(mAtoLaser)
-        oled.text(uWScreenVal, 0, 48)
+        oled.text(uWScreenVal, 0, 24, 1)
+        #print(uWScreenVal)
         #TODO: λ
-        oled.text('\u03BB: 635 nm', 0, 56)
+        #oled.text('\u03BB: 635 nm', 0, 24, 1)
         oled.show()
-        time.sleep(250)
+        time.sleep(0.5)
 
 
 
