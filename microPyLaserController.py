@@ -1,6 +1,7 @@
 from machine import Pin, I2C
 from ssd1306 import SSD1306_I2C
 import time
+import math
 import framebuf
 # import framebuf
 
@@ -33,15 +34,22 @@ def checkInputCurrent():
     #mAtoLaserOutput = int(1000 * (mappedVoltage/resistorVal))
     #TODO: LM358 boosted value needs to be divided by 10 to get the true result:
     mAtoLaserOutput = round((1000 * ((mappedVoltage/10)/resistorVal)),1)
-    print(adcRawReading,mappedVoltage,mAtoLaserOutput)
-    return mAtoLaserOutput
+    #TODO: empirically determined 05/14/22 the system is ~5 mA high from it's actual output throughout the entire range, this is the correction for it
+    adjustedmAtoLaserOutput = mAtoLaserOutput - 5
+    print(adcRawReading,mappedVoltage,mAtoLaserOutput,adjustedmAtoLaserOutput)
+    return adjustedmAtoLaserOutput
 
 def mapVal(value, istart, istop, ostart, ostop):
   return ostart + (ostop - ostart) * ((value - istart) / (istop - istart))
 
 def calculateLaserOutput(mAtoLaser):
+    #TODO: deprecating linear method
     # 50 mA == 1.2 mW or 1200 uW
-    uW = int(mAtoLaser*(1200/50))
+    # uW = int(mAtoLaser*(1200/50))
+    
+    #TODO: setup new exponential output model based on empirical laser results
+    # formula: 0.00438e ^ 0.116x     R=0.933, so its not bad...
+    uW = (0.00438 * math.exp(0.116 * mAtoLaser)) * 1000 
     # mW = 1000 * uW
     outputStr = 'output: ' + str(uW) + ' uW'
     return outputStr
